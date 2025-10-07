@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf};
+use std::path::PathBuf;
 
 use app::TestSettings;
 use clap::{Parser, Subcommand};
