@@ -2,8 +2,7 @@ use crate::gui::{
     debug_draw_center_crosshair, draw_color_dropper_icon, draw_color_dropper_preview, draw_info_ui,
     draw_keymap, is_clicking_gui,
 };
-use crate::persistence::save;
-use crate::replay::{load_replay, play_replay, stop_replay};
+use crate::replay::{load_replay, play_replay, replay_inputs, stop_replay};
 use log::{debug, error, info};
 use raylib::prelude::{Vector2, *};
 use serde::{Deserialize, Serialize};
@@ -455,51 +454,10 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
         );
 
         if state.is_playing_inputs {
-            // NOTE: Multiple events could be executed in a single frame
-            while state.play_frame_counter
-                == automation_events[state.current_play_frame].frame() as usize
-            {
-                let event = &automation_events[state.current_play_frame];
-                debug!(
-                    "Event {:?}: type {:?}",
-                    state.current_play_frame,
-                    event.get_type()
-                );
-
-                event.play();
-                state.current_play_frame += 1;
-
-                if state.current_play_frame == automation_events.len() {
-                    stop_replay(&mut state);
-
-                    info!("Finished playing replay");
-                    if let Some(ref test_options) = test_options {
-                        if test_options.save_after_replay {
-                            info!("Attempting to save since replay has finished");
-                            match save(&state, &test_options.save_path) {
-                                Ok(_) => info!(
-                                    "Successfully saved to {}",
-                                    test_options.save_path.display()
-                                ),
-                                Err(e) => error!(
-                                    "Failed to save to {}: {}",
-                                    test_options.save_path.display(),
-                                    e
-                                ),
-                            }
-                        } else {
-                            info!("Not saving - Save after replay finishes has been disabled");
-                        }
-
-                        if test_options.quit_after_replay {
-                            info!("Quitting - Quit after replay is enabled");
-                            return;
-                        }
-                    }
-                    break;
-                }
+            let should_quit = replay_inputs(&mut state, &test_options, &automation_events);
+            if should_quit {
+                return;
             }
-            state.play_frame_counter += 1;
         }
 
         {
