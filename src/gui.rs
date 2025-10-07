@@ -3,7 +3,6 @@ use raylib::{
     drawing::{RaylibDraw, RaylibDrawHandle, RaylibMode2D},
     math::{rrect, rvec2, Rectangle, Vector2},
     rgui::RaylibDrawGui,
-    rstr,
     text::{RaylibFont, WeakFont},
     texture::Texture2D,
 };
@@ -84,7 +83,7 @@ pub fn draw_keymap(
 ) {
     // TODO: FIXME: Text will happily overflow the bounds of the panel if it's long enough
 
-    drawing.gui_group_box(keymap_panel_bounds, Some(rstr!("Keymappings")));
+    drawing.gui_group_box(keymap_panel_bounds, "Keymappings");
 
     let spacing_y = 30.0;
     let spacing_x = 30.0;

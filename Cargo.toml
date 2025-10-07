@@ -9,7 +9,7 @@ edition = "2021"
 clap = { version = "4.5.16", features = ["derive"] }
 env_logger = "0.11.5"
 log = "0.4.22"
-raylib = { version = "5.0.0", features = ["serde", "with_serde", "serde_json"] }
+raylib = { version = "5.5.0", features = ["serde", "with_serde", "serde_json"] }
 rfd = "0.14.1"
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.107"
