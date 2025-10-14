@@ -10,8 +10,8 @@ use raylib::math::rrect;
 use raylib::RaylibHandle;
 
 use crate::app::{
-    Brush, GuiColorPickerInfo, HoldCommand, Keymap, Mode, Point, PressCommand, Stroke, Text, Tool,
-    RECORDING_OUTPUT_PATH,
+    Brush, GuiColorPickerInfo, HoldCommand, Keymap, Mode, Point, PressCommand, Stroke, Text, Thing,
+    Tool, RECORDING_OUTPUT_PATH,
 };
 use crate::persistence::{self, save, save_with_file_picker};
 use crate::replay::{load_replay, play_replay};
@@ -65,7 +65,10 @@ pub fn process_key_down_events(
                         let mut generated_stroke = Stroke::new(Color::SKYBLUE, 10.0);
                         generated_stroke.points = generated_points;
 
-                        state.add_stroke_with_undo(generated_stroke);
+                        let thing = Thing {
+                            kind: crate::app::Renderable::Stroke(generated_stroke),
+                        };
+                        state.add_thing_with_undo(thing);
                     }
                 }
                 ChangeTextSize(size_diff_per_sec) => {

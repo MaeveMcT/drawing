@@ -2,11 +2,11 @@ use crate::gui::{
     debug_draw_center_crosshair, draw_color_dropper_icon, draw_color_dropper_preview, draw_info_ui,
     draw_keymap, is_clicking_gui,
 };
-use crate::replay::{load_replay, play_replay, replay_inputs, stop_replay};
-use log::{debug, error, info};
+use crate::replay::{load_replay, play_replay, replay_inputs};
+use log::{debug, error};
 use raylib::prelude::{Vector2, *};
 use serde::{Deserialize, Serialize};
-use slotmap::{new_key_type, DefaultKey, SlotMap};
+use slotmap::{new_key_type, SlotMap};
 use std::{
     cmp,
     collections::HashMap,
@@ -90,12 +90,10 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
     };
 
     let mut state = State {
-        strokes: SlotMap::new(),
+        things: SlotMap::with_key(),
         undo_actions: Vec::new(),
         redo_actions: Vec::new(),
-        stroke_graveyard: SlotMap::new(),
-        text: SlotMap::with_key(),
-        text_graveyard: SlotMap::with_key(),
+        things_graveyard: SlotMap::with_key(),
         output_path: None,
         camera,
         background_color: Default::default(),
@@ -275,7 +273,10 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         // TODO: FIXME: Do not allow text tool if currently drawing, otherwise we won't be able to end
                         // the brush stroke unless we change back to brush mode
                         if is_drawing {
-                            state.add_stroke_with_undo(working_stroke);
+                            let thing = Thing {
+                                kind: Renderable::Stroke(working_stroke),
+                            };
+                            state.add_thing_with_undo(thing);
                             working_stroke =
                                 Stroke::new(state.foreground_color.0, brush.brush_size);
                         }
@@ -348,7 +349,10 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         if !text.content.is_empty() {
                             text.color = state.text_color;
                             text.size = state.text_size;
-                            state.add_text_with_undo(text);
+                            let thing = Thing {
+                                kind: Renderable::Text(text),
+                            };
+                            state.add_thing_with_undo(thing);
                         }
                     }
 
@@ -466,21 +470,25 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                 let mut drawing_camera = drawing.begin_mode2D(state.camera);
 
                 drawing_camera.clear_background(state.background_color.0);
-                for (_, stroke) in &state.strokes {
-                    if is_stroke_in_camera_view(&camera_view_boundary, stroke) {
-                        draw_stroke(&mut drawing_camera, &stroke, stroke.brush_size);
-                    }
-                }
-                for (_, text) in &state.text {
-                    if let Some(pos) = text.position {
-                        if camera_view_boundary.check_collision_point_rec(pos) {
-                            drawing_camera.draw_text(
-                                &text.content,
-                                pos.x as i32,
-                                pos.y as i32,
-                                text.size.0 as i32,
-                                text.color.0,
-                            );
+                for (_, thing) in &state.things {
+                    match &thing.kind {
+                        Renderable::Stroke(stroke) => {
+                            if is_stroke_in_camera_view(&camera_view_boundary, stroke) {
+                                draw_stroke(&mut drawing_camera, &stroke, stroke.brush_size);
+                            }
+                        }
+                        Renderable::Text(text) => {
+                            if let Some(pos) = text.position {
+                                if camera_view_boundary.check_collision_point_rec(pos) {
+                                    drawing_camera.draw_text(
+                                        &text.content,
+                                        pos.x as i32,
+                                        pos.y as i32,
+                                        text.size.0 as i32,
+                                        text.color.0,
+                                    );
+                                }
+                            }
                         }
                     }
                 }
@@ -687,7 +695,7 @@ fn is_stroke_in_camera_view(camera_boundary: &Rectangle, stroke: &Stroke) -> boo
     return false;
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct Point {
     pub x: f32,
     pub y: f32,
@@ -709,13 +717,24 @@ impl Display for Point {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct Stroke {
     pub points: Vec<Point>,
     pub color: Color,
     pub brush_size: f32,
     // TODO(reece): Could store the brush used in the stroke so we know the parameters of each
     // stroke
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub enum Renderable {
+    Stroke(Stroke),
+    Text(Text),
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub(crate) struct Thing {
+    pub kind: Renderable,
 }
 
 impl Stroke {
@@ -729,19 +748,18 @@ impl Stroke {
     }
 }
 
-// TODO: strokes and stroke_graveyard should have different key types probably
-pub(crate) type Strokes = SlotMap<DefaultKey, Stroke>;
+// TODO: things and things_graveyard should have different key types probably
+new_key_type! { pub(crate) struct ThingKey; }
+pub(crate) type Things = SlotMap<ThingKey, Thing>;
 
 new_key_type! { pub(crate) struct TextKey; }
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) enum Action {
-    AddStroke(DefaultKey),
-    RemoveStroke(DefaultKey),
-    AddText(TextKey),
-    RemoveText(TextKey),
+    AddThing(ThingKey),
+    RemoveThing(ThingKey),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct Text {
     pub content: String,
     pub position: Option<Vector2>,
