@@ -47,9 +47,15 @@ pub fn debug_draw_info(
     drawing.draw_text(&target_str, 5, 120, 30, Color::RED);
     let drawing_pos_str = format!("draw pos {:?}", drawing_pos);
     drawing.draw_text(&drawing_pos_str, 5, 150, 30, Color::RED);
-    // TODO: Print number of strokes from the things thingy
-    //    let number_of_strokes_str = format!("Total strokes: {}", state.strokes.len());
-    //drawing.draw_text(&number_of_strokes_str, 5, 180, 30, Color::RED);
+
+    let number_of_strokes = state
+        .things
+        .iter()
+        .filter(|(_, thing)| matches!(thing.kind, crate::app::Renderable::Stroke(_)))
+        .count();
+
+    let number_of_strokes_str = format!("Total strokes: {}", number_of_strokes);
+    drawing.draw_text(&number_of_strokes_str, 5, 180, 30, Color::RED);
     let fps_str = format!("FPS: {}", current_fps);
     drawing.draw_text(&fps_str, 5, 210, 30, Color::RED);
 }
