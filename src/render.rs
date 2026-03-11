@@ -1,4 +1,4 @@
-use crate::app::{Brush, Stroke};
+use crate::app::{Brush, Stroke, Thing, Things};
 use raylib::color::Color;
 use raylib::drawing::{RaylibDraw, RaylibDrawHandle, RaylibMode2D};
 use raylib::math::{rvec2, Vector2};
@@ -24,4 +24,22 @@ pub fn draw_brush_marker(
         brush.brush_size / 2.0,
         Color::BLACK,
     );
+}
+
+pub fn draw_bounding_boxes(
+    things: &Things,
+    drawing_camera: &mut RaylibMode2D<'_, RaylibDrawHandle<'_>>,
+) {
+    for (_, thing) in things {
+        let bounding_box = thing.bounding_box().unwrap();
+        let width = bounding_box.max_x - bounding_box.min_x;
+        let height = bounding_box.max_y - bounding_box.min_y;
+        drawing_camera.draw_rectangle_lines(
+            bounding_box.min_x as i32,
+            bounding_box.min_y as i32,
+            width as i32,
+            height as i32,
+            Color::PURPLE,
+        );
+    }
 }

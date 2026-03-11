@@ -20,7 +20,7 @@ use crate::input::{
     get_char_pressed, is_mouse_button_down, is_mouse_button_pressed, process_key_down_events,
     process_key_pressed_events, was_mouse_button_released,
 };
-use crate::render::{draw_brush_marker, draw_stroke};
+use crate::render::{draw_bounding_boxes, draw_brush_marker, draw_stroke};
 use crate::state::{ForegroundColor, State, TextColor, TextSize};
 use crate::{gui::debug_draw_info, input::append_input_to_working_text};
 
@@ -492,6 +492,9 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         }
                     }
                 }
+                if debugging {
+                    draw_bounding_boxes(&state.things, &mut drawing_camera);
+                }
 
                 // TODO(reece): Do we want to treat the working_stroke as a special case to draw?
                 draw_stroke(
@@ -735,6 +738,46 @@ pub enum Renderable {
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct Thing {
     pub kind: Renderable,
+}
+
+pub struct BoundingBox {
+    pub min_x: f64,
+    pub min_y: f64,
+    pub max_x: f64,
+    pub max_y: f64,
+}
+
+impl Thing {
+    pub fn bounding_box(&self) -> Option<BoundingBox> {
+        match &self.kind {
+            Renderable::Stroke(stroke) => {
+                let (min_x, max_x, min_y, max_y) = stroke.points.iter().fold(
+                    (
+                        f64::INFINITY,
+                        f64::NEG_INFINITY,
+                        f64::INFINITY,
+                        f64::NEG_INFINITY,
+                    ),
+                    |(min_x, max_x, min_y, max_y), point| {
+                        (
+                            min_x.min(point.x as f64),
+                            max_x.max(point.x as f64),
+                            min_y.min(point.y as f64),
+                            max_y.max(point.y as f64),
+                        )
+                    },
+                );
+
+                return Some(BoundingBox {
+                    min_x,
+                    min_y,
+                    max_x,
+                    max_y,
+                });
+            }
+            Renderable::Text(text) => todo!(),
+        }
+    }
 }
 
 impl Stroke {
