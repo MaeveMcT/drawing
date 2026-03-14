@@ -40,8 +40,6 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
     let mut screen_width = 1280;
     let mut screen_height = 720;
 
-    // TODO: Selectable objects (Like selecting existing text and moving it)
-
     let (mut rl, rl_thread) = raylib::init()
         .size(screen_width, screen_height)
         .resizable()
@@ -173,7 +171,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
         state.camera.offset = rvec2(screen_width / 2, screen_height / 2);
 
         state.mouse_pos = rl.get_mouse_position();
-        let drawing_pos = rl.get_screen_to_world2D(state.mouse_pos, state.camera);
+        let mouse_drawing_pos = rl.get_screen_to_world2D(state.mouse_pos, state.camera);
 
         let keymap_panel_padding_percent = 0.10;
         let keymap_panel_padding_x = screen_width as f32 * keymap_panel_padding_percent;
@@ -245,7 +243,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         if !is_color_picker_active(&color_picker_info) {
                             if brush.brush_type == BrushType::Deleting {
                                 let strokes_to_delete =
-                                    state.strokes_within_point(drawing_pos, brush.brush_size);
+                                    state.strokes_within_point(mouse_drawing_pos, brush.brush_size);
                                 state.delete_strokes(strokes_to_delete);
                             } else {
                                 // Drawing
@@ -256,8 +254,8 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                                 }
 
                                 let point = Point {
-                                    x: drawing_pos.x,
-                                    y: drawing_pos.y,
+                                    x: mouse_drawing_pos.x,
+                                    y: mouse_drawing_pos.y,
                                 };
                                 working_stroke.points.push(point);
                             }
@@ -297,7 +295,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                             if working_text.is_none() {
                                 working_text = Some(Text {
                                     content: "".to_string(),
-                                    position: Some(drawing_pos),
+                                    position: Some(mouse_drawing_pos),
                                     size: state.text_size,
                                     color: state.text_color,
                                 });
@@ -327,9 +325,15 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         MouseButton::MOUSE_BUTTON_LEFT,
                         &mut mouse_buttons_pressed_this_frame,
                     ) {
-                        unimplemented!("Selection TODO");
-                        // TODO: Get ALL the bounding boxes for the position we just clicked. Can
-                        // just grab the first one for now
+                        // TODO: Drag a selection area rather than a single point
+                        let mut things_in_selection = vec![];
+                        for (thing_key, thing) in &state.things {
+                            if let Some(bounding_box) = thing.bounding_box() {
+                                if bounding_box.is_point_within(mouse_drawing_pos) {
+                                    things_in_selection.push(thing_key);
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -516,14 +520,14 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
 
                 // Draw "world space" GUI elements for the current mode
                 if should_show_brush_marker(state.mode) {
-                    draw_brush_marker(&mut drawing_camera, drawing_pos, &brush);
+                    draw_brush_marker(&mut drawing_camera, mouse_drawing_pos, &brush);
                 }
 
                 if state.mode == Mode::UsingTool(Tool::Text) {
                     drawing_camera.draw_text(
                         "Your text here",
-                        drawing_pos.x as i32,
-                        drawing_pos.y as i32,
+                        mouse_drawing_pos.x as i32,
+                        mouse_drawing_pos.y as i32,
                         state.text_size.0 as i32,
                         state.text_color.0,
                     );
@@ -626,7 +630,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
             draw_info_ui(&mut drawing, &state, &brush);
 
             if debugging {
-                debug_draw_info(&mut drawing, &state, drawing_pos, current_fps);
+                debug_draw_info(&mut drawing, &state, mouse_drawing_pos, current_fps);
             }
         }
 
@@ -751,11 +755,15 @@ pub(crate) struct Thing {
     pub kind: Renderable,
 }
 
+#[derive(Debug)]
 pub struct BoundingBox {
-    pub min_x: f64,
-    pub min_y: f64,
-    pub max_x: f64,
-    pub max_y: f64,
+    pub bounds: Rectangle,
+}
+
+impl BoundingBox {
+    fn is_point_within(&self, pos: Vector2) -> bool {
+        self.bounds.check_collision_point_rec(pos)
+    }
 }
 
 impl Thing {
@@ -764,26 +772,23 @@ impl Thing {
             Renderable::Stroke(stroke) => {
                 let (min_x, max_x, min_y, max_y) = stroke.points.iter().fold(
                     (
-                        f64::INFINITY,
-                        f64::NEG_INFINITY,
-                        f64::INFINITY,
-                        f64::NEG_INFINITY,
+                        f32::INFINITY,
+                        f32::NEG_INFINITY,
+                        f32::INFINITY,
+                        f32::NEG_INFINITY,
                     ),
                     |(min_x, max_x, min_y, max_y), point| {
                         (
-                            min_x.min(point.x as f64),
-                            max_x.max(point.x as f64),
-                            min_y.min(point.y as f64),
-                            max_y.max(point.y as f64),
+                            min_x.min(point.x),
+                            max_x.max(point.x),
+                            min_y.min(point.y),
+                            max_y.max(point.y),
                         )
                     },
                 );
 
                 return Some(BoundingBox {
-                    min_x,
-                    min_y,
-                    max_x,
-                    max_y,
+                    bounds: rrect(min_x, min_y, max_x - min_x, max_y - min_y),
                 });
             }
             Renderable::Text(text) => todo!(),
