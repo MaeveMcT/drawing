@@ -1,10 +1,10 @@
-use crate::app::{Brush, Stroke, Thing, Things};
+use crate::app::{Brush, Stroke, Things};
 use raylib::color::Color;
 use raylib::drawing::{RaylibDraw, RaylibDrawHandle, RaylibMode2D};
 use raylib::math::{rvec2, Vector2};
 
 pub fn draw_stroke(drawing: &mut RaylibMode2D<RaylibDrawHandle>, stroke: &Stroke, brush_size: f32) {
-    if stroke.points.len() == 0 {
+    if stroke.points.is_empty() {
         return;
     }
 

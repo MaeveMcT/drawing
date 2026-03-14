@@ -20,3 +20,6 @@ replace-with = "vendored-sources"
 
 [source.vendored-sources]
 directory = "vendor"
+
+[lints.clippy]
+needless_return = "allow"

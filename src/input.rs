@@ -92,7 +92,7 @@ pub fn process_key_pressed_events(
     debugging: &mut bool,
     rl: &mut RaylibHandle,
     brush: &mut Brush,
-    mut state: &mut State,
+    state: &mut State,
     processed_commands: &mut HashMap<PressCommand, bool>,
     automation_events_list: &mut AutomationEventList,
     automation_events: &mut Vec<AutomationEvent>,
@@ -124,22 +124,22 @@ pub fn process_key_pressed_events(
                 ToggleDebugging => *debugging = !*debugging,
                 Save => {
                     if let Some(current_path) = state.output_path.clone() {
-                        if let Err(err) = save(&mut state, &current_path) {
+                        if let Err(err) = save(state, &current_path) {
                             eprintln!(
                                 "Could not save {}. Error: {}",
                                 current_path.to_string_lossy(),
-                                err.to_string()
+                                err
                             )
                         }
                     } else {
-                        save_with_file_picker(&mut state);
+                        save_with_file_picker(state);
                     }
                 }
                 SaveAs => {
-                    save_with_file_picker(&mut state);
+                    save_with_file_picker(state);
                 }
                 Load => {
-                    persistence::load_with_file_picker(&mut state);
+                    persistence::load_with_file_picker(state);
                 }
                 Undo => {
                     state.undo();
@@ -214,7 +214,7 @@ pub fn process_key_pressed_events(
                             automation_events_list,
                             automation_events,
                         ) {
-                            Some(_) => play_replay(&mut state),
+                            Some(_) => play_replay(state),
                             None => error!("Error loading replay"),
                         }
                     }
