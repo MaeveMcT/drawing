@@ -10,7 +10,7 @@ pub fn save_with_file_picker(state: &mut State) {
             eprintln!(
                 "Could not save {}. Error: {}",
                 &path.to_string_lossy(),
-                err.to_string()
+                err
             )
         } else {
             state.output_path = Some(path);
@@ -24,7 +24,7 @@ pub fn save(state: &State, path: &Path) -> Result<(), std::io::Error> {
     // TODO: FIXME: There's no versioning for save files at the moment
     // so anything new isn't backwards compatible
     let output = serde_json::to_string(&state)?;
-    let mut file = File::create(&path)?;
+    let mut file = File::create(path)?;
     file.write_all(output.as_bytes())?;
     Ok(())
 }

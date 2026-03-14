@@ -21,7 +21,7 @@ pub fn draw_info_ui(drawing: &mut RaylibDrawHandle, state: &State, brush: &Brush
         BrushType::Drawing => "Drawing",
         BrushType::Deleting => "Deleting",
     };
-    let brush_size_str = format!("Brush size: {}", brush.brush_size.to_string());
+    let brush_size_str = format!("Brush size: {}", brush.brush_size);
     let text_size_str = format!("Text size: {}", state.text_size.0);
     let zoom_str = format!("Zoom: {:.2}", state.camera.zoom);
     if state.mode == Mode::UsingTool(Tool::Brush) {
@@ -188,7 +188,7 @@ pub fn draw_color_dropper_icon(
         scaled_height,
     );
     drawing.draw_texture_pro(
-        &color_dropper_icon,
+        color_dropper_icon,
         texture_rect,
         color_dropper_screen_location,
         rvec2(0, 0),

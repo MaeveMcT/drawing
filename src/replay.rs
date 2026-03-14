@@ -78,7 +78,7 @@ pub fn replay_inputs(
             if let Some(ref test_options) = test_options {
                 if test_options.save_after_replay {
                     info!("Attempting to save since replay has finished");
-                    match save(&state, &test_options.save_path) {
+                    match save(state, &test_options.save_path) {
                         Ok(_) => {
                             info!("Successfully saved to {}", test_options.save_path.display())
                         }

@@ -193,39 +193,38 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
         );
 
         // color picker activate check
-        if state.mode == Mode::UsingTool(Tool::Brush) || state.using_text_tool_or_typing() {
-            if is_mouse_button_down(
+        if (state.mode == Mode::UsingTool(Tool::Brush) || state.using_text_tool_or_typing())
+            && is_mouse_button_down(
                 &mut rl,
                 MouseButton::MOUSE_BUTTON_RIGHT,
                 &mut mouse_buttons_pressed_this_frame,
-            ) {
-                debug!("Making colour picker active");
-                let picker_width = 100;
-                let picker_height = 100;
-                color_picker_info = Some(GuiColorPickerInfo {
-                    initiation_pos: state.mouse_pos,
-                    bounds: rrect(
-                        state.mouse_pos.x - (picker_width as f32 / 2.0),
-                        state.mouse_pos.y - (picker_height as f32 / 2.0),
-                        picker_width,
-                        picker_height,
-                    ),
-                    picker_slider_x_padding: 30.0,
-                });
-            }
+            )
+        {
+            debug!("Making colour picker active");
+            let picker_width = 100;
+            let picker_height = 100;
+            color_picker_info = Some(GuiColorPickerInfo {
+                initiation_pos: state.mouse_pos,
+                bounds: rrect(
+                    state.mouse_pos.x - (picker_width as f32 / 2.0),
+                    state.mouse_pos.y - (picker_height as f32 / 2.0),
+                    picker_width,
+                    picker_height,
+                ),
+                picker_slider_x_padding: 30.0,
+            });
         }
 
         // color picker closer check
         if let Some(picker_info) = &color_picker_info {
-            if !is_clicking_gui(state.mouse_pos, picker_info.bounds_with_slider()) {
-                if is_mouse_button_down(
+            if !is_clicking_gui(state.mouse_pos, picker_info.bounds_with_slider())
+                && is_mouse_button_down(
                     &mut rl,
                     MouseButton::MOUSE_BUTTON_LEFT,
                     &mut mouse_buttons_pressed_this_frame,
                 ) {
                     close_color_picker(&mut color_picker_info, &mut color_picker_closed_this_frame);
                 }
-            }
         }
 
         match state.mode {
@@ -239,8 +238,8 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         &mut rl,
                         MouseButton::MOUSE_BUTTON_LEFT,
                         &mut mouse_buttons_pressed_this_frame,
-                    ) {
-                        if !is_color_picker_active(&color_picker_info) {
+                    )
+                        && !is_color_picker_active(&color_picker_info) {
                             if brush.brush_type == BrushType::Deleting {
                                 let strokes_to_delete =
                                     state.strokes_within_point(mouse_drawing_pos, brush.brush_size);
@@ -260,7 +259,6 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                                 working_stroke.points.push(point);
                             }
                         }
-                    }
                     if was_mouse_button_released(
                         &mut rl,
                         MouseButton::MOUSE_BUTTON_LEFT,
@@ -286,8 +284,8 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         &mut rl,
                         MouseButton::MOUSE_BUTTON_LEFT,
                         &mut mouse_buttons_pressed_this_frame,
-                    ) {
-                        if !is_color_picker_active(&color_picker_info)
+                    )
+                        && !is_color_picker_active(&color_picker_info)
                             && !color_picker_closed_this_frame
                         {
                             debug!("Hit left click on text tool");
@@ -302,7 +300,6 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                             }
                             state.mode = Mode::TypingText;
                         }
-                    }
                 }
                 Tool::ColorPicker => {
                     if is_mouse_button_down(
@@ -342,20 +339,19 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                     &mut rl,
                     MouseButton::MOUSE_BUTTON_LEFT,
                     &mut mouse_buttons_pressed_this_frame,
-                ) {
-                    if !is_clicking_gui(state.mouse_pos, color_picker.bounds_with_slider()) {
-                        state.mode = Mode::UsingTool(Tool::Brush);
-                    }
+                ) && !is_clicking_gui(state.mouse_pos, color_picker.bounds_with_slider())
+                {
+                    state.mode = Mode::UsingTool(Tool::Brush);
                 }
             }
             Mode::TypingText => {
-                if rl.is_key_down(KeyboardKey::KEY_BACKSPACE) {
-                    if time_since_last_text_deletion >= delay_between_text_deletions {
-                        if let Some(text) = working_text.as_mut() {
-                            let _removed_char = text.content.pop();
-                        }
-                        time_since_last_text_deletion = Duration::ZERO;
+                if rl.is_key_down(KeyboardKey::KEY_BACKSPACE)
+                    && time_since_last_text_deletion >= delay_between_text_deletions
+                {
+                    if let Some(text) = working_text.as_mut() {
+                        let _removed_char = text.content.pop();
                     }
+                    time_since_last_text_deletion = Duration::ZERO;
                 }
 
                 if rl.is_key_down(KeyboardKey::KEY_ENTER) {
@@ -385,14 +381,13 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                 //      - We'd need to make our own "repeat key" logic, as holding a key looks like
                 //      it only gets 1 key pressed raylib event fired off (makes sense)
 
-                match char_pressed {
-                    Some(ch) => append_input_to_working_text(
+                if let Some(ch) = char_pressed {
+                    append_input_to_working_text(
                         ch,
                         &mut working_text,
                         state.text_size,
                         state.text_color,
-                    ),
-                    None => (),
+                    )
                 }
             }
             Mode::ShowingKeymapPanel => {
@@ -400,10 +395,9 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                     &mut rl,
                     MouseButton::MOUSE_BUTTON_LEFT,
                     &mut mouse_buttons_pressed_this_frame,
-                ) {
-                    if !is_clicking_gui(state.mouse_pos, keymap_panel_bounds) {
-                        state.mode = Mode::default();
-                    }
+                ) && !is_clicking_gui(state.mouse_pos, keymap_panel_bounds)
+                {
+                    state.mode = Mode::default();
                 }
             }
         }
@@ -489,7 +483,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                     match &thing.kind {
                         Renderable::Stroke(stroke) => {
                             if is_stroke_in_camera_view(&camera_view_boundary, stroke) {
-                                draw_stroke(&mut drawing_camera, &stroke, stroke.brush_size);
+                                draw_stroke(&mut drawing_camera, stroke, stroke.brush_size);
                             }
                         }
                         Renderable::Text(text) => {
@@ -595,15 +589,10 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                     }
                 }
 
-                if state.mode == Mode::UsingTool(Tool::Brush) {
-                    if !is_drawing {
-                        // Hide when not drawing
-                        state.foreground_color.0 = drawing.gui_color_picker(
-                            picker_info.bounds,
-                            "",
-                            state.foreground_color.0,
-                        );
-                    }
+                if state.mode == Mode::UsingTool(Tool::Brush) && !is_drawing {
+                    // Hide when not drawing
+                    state.foreground_color.0 =
+                        drawing.gui_color_picker(picker_info.bounds, "", state.foreground_color.0);
                 }
                 // TODO: Scale the GUI?
                 if debugging {
@@ -689,13 +678,7 @@ fn apply_mouse_wheel_text_size(mouse_wheel_diff: f32, current_text_size: &mut Te
 }
 
 fn clamp_camera_zoom(camera: &mut Camera2D) {
-    if camera.zoom < 0.1 {
-        camera.zoom = 0.1;
-    }
-
-    if camera.zoom > 10.0 {
-        camera.zoom = 10.0;
-    }
+    camera.zoom = camera.zoom.clamp(0.1, 10.0);
 }
 
 fn clamp_brush_size(brush: &mut Brush) {
@@ -719,12 +702,9 @@ pub(crate) struct Point {
     pub y: f32,
 }
 
-impl Into<ffi::Vector2> for &Point {
-    fn into(self) -> ffi::Vector2 {
-        ffi::Vector2 {
-            x: self.x,
-            y: self.y,
-        }
+impl From<&Point> for ffi::Vector2 {
+    fn from(val: &Point) -> Self {
+        ffi::Vector2 { x: val.x, y: val.y }
     }
 }
 
@@ -791,7 +771,7 @@ impl Thing {
                     bounds: rrect(min_x, min_y, max_x - min_x, max_y - min_y),
                 });
             }
-            Renderable::Text(text) => todo!(),
+            Renderable::Text(_text) => todo!(),
         }
     }
 }
@@ -992,11 +972,10 @@ impl GuiColorPickerInfo {
     }
 }
 fn should_show_brush_marker(mode: Mode) -> bool {
-    match mode {
-        Mode::UsingTool(Tool::Brush) => true,
-        Mode::ShowingKeymapPanel => true,
-        _ => false,
-    }
+    matches!(
+        mode,
+        Mode::UsingTool(Tool::Brush) | Mode::ShowingKeymapPanel
+    )
 }
 
 fn is_color_picker_active(color_picker_info: &Option<GuiColorPickerInfo>) -> bool {
