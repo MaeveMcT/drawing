@@ -24,7 +24,7 @@ use crate::render::{draw_bounding_boxes, draw_brush_marker, draw_stroke};
 use crate::state::{ForegroundColor, State, TextColor, TextSize};
 use crate::{gui::debug_draw_info, input::append_input_to_working_text};
 
-pub const RECORDING_OUTPUT_PATH: &'static str = "recording.rae";
+pub const RECORDING_OUTPUT_PATH: &str = "recording.rae";
 
 #[derive(Debug)]
 pub struct TestSettings {
@@ -319,6 +319,17 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
 
                         // TODO: Text colour picking as well
                         state.mode = Mode::UsingTool(Tool::Brush);
+                    }
+                }
+                Tool::Selection => {
+                    if is_mouse_button_down(
+                        &mut rl,
+                        MouseButton::MOUSE_BUTTON_LEFT,
+                        &mut mouse_buttons_pressed_this_frame,
+                    ) {
+                        unimplemented!("Selection TODO");
+                        // TODO: Get ALL the bounding boxes for the position we just clicked. Can
+                        // just grab the first one for now
                     }
                 }
             },
@@ -840,6 +851,7 @@ pub(crate) enum PressCommand {
     UseColorPicker,
     ToggleRecording,
     LoadAndPlayRecordedInputs,
+    UseSelectionPicker,
 }
 
 type KeyboardKeyCombo = Vec<KeyboardKey>;
@@ -892,6 +904,7 @@ fn default_keymap() -> Keymap {
             vec![KeyboardKey::KEY_APOSTROPHE],
             PressCommand::LoadAndPlayRecordedInputs,
         ),
+        (vec![KeyboardKey::KEY_G], PressCommand::UseSelectionPicker),
     ]);
     let on_hold = HoldKeyMappings::from([
         (KeyboardKey::KEY_A, HoldCommand::PanCameraHorizontal(-250)),
@@ -938,6 +951,7 @@ pub(crate) enum Tool {
     Brush,
     Text,
     ColorPicker,
+    Selection,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]

@@ -175,6 +175,9 @@ pub fn process_key_pressed_events(
                 UseColorPicker => {
                     state.mode = Mode::UsingTool(Tool::ColorPicker);
                 }
+                UseSelectionPicker => {
+                    state.mode = Mode::UsingTool(Tool::Selection);
+                }
                 ToggleKeymapWindow => match state.mode {
                     Mode::ShowingKeymapPanel => state.mode = Mode::default(),
                     _ => state.mode = Mode::ShowingKeymapPanel,
