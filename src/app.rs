@@ -334,13 +334,18 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         }
                         state.selected_things = if !things_in_selection.is_empty() {
                             // TODO: Handle multiple selection, not just 1 item at a time
+                            state.mode = Mode::UsingTool(Tool::Move);
                             Some(things_in_selection[0])
+
                             // TODO: If something is successfully selected, we should go into
                             // MoveTool mode right?
                         } else {
                             None
                         };
                     }
+                }
+                Tool::Move => {
+                    // TODO: Implement move functionality
                 }
             },
             Mode::PickingBackgroundColor(color_picker) => {
@@ -954,6 +959,7 @@ pub(crate) enum Tool {
     Text,
     ColorPicker,
     Selection,
+    Move,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
