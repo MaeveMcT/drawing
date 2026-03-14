@@ -64,6 +64,8 @@ pub struct State {
     pub current_play_frame: usize,
     #[serde(skip)]
     pub play_frame_counter: usize,
+    #[serde(skip)]
+    pub selected_things: Option<ThingKey>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
