@@ -104,6 +104,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
         is_playing_inputs: false,
         current_play_frame: 0,
         play_frame_counter: 0,
+        selected_things: None,
     };
 
     if let Some(replay_path) = replay_path {
@@ -222,9 +223,10 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                     &mut rl,
                     MouseButton::MOUSE_BUTTON_LEFT,
                     &mut mouse_buttons_pressed_this_frame,
-                ) {
-                    close_color_picker(&mut color_picker_info, &mut color_picker_closed_this_frame);
-                }
+                )
+            {
+                close_color_picker(&mut color_picker_info, &mut color_picker_closed_this_frame);
+            }
         }
 
         match state.mode {
@@ -238,27 +240,27 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         &mut rl,
                         MouseButton::MOUSE_BUTTON_LEFT,
                         &mut mouse_buttons_pressed_this_frame,
-                    )
-                        && !is_color_picker_active(&color_picker_info) {
-                            if brush.brush_type == BrushType::Deleting {
-                                let strokes_to_delete =
-                                    state.strokes_within_point(mouse_drawing_pos, brush.brush_size);
-                                state.delete_strokes(strokes_to_delete);
-                            } else {
-                                // Drawing
-                                if !is_drawing {
-                                    working_stroke =
-                                        Stroke::new(state.foreground_color.0, brush.brush_size);
-                                    is_drawing = true;
-                                }
-
-                                let point = Point {
-                                    x: mouse_drawing_pos.x,
-                                    y: mouse_drawing_pos.y,
-                                };
-                                working_stroke.points.push(point);
+                    ) && !is_color_picker_active(&color_picker_info)
+                    {
+                        if brush.brush_type == BrushType::Deleting {
+                            let strokes_to_delete =
+                                state.strokes_within_point(mouse_drawing_pos, brush.brush_size);
+                            state.delete_strokes(strokes_to_delete);
+                        } else {
+                            // Drawing
+                            if !is_drawing {
+                                working_stroke =
+                                    Stroke::new(state.foreground_color.0, brush.brush_size);
+                                is_drawing = true;
                             }
+
+                            let point = Point {
+                                x: mouse_drawing_pos.x,
+                                y: mouse_drawing_pos.y,
+                            };
+                            working_stroke.points.push(point);
                         }
+                    }
                     if was_mouse_button_released(
                         &mut rl,
                         MouseButton::MOUSE_BUTTON_LEFT,
@@ -284,22 +286,21 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         &mut rl,
                         MouseButton::MOUSE_BUTTON_LEFT,
                         &mut mouse_buttons_pressed_this_frame,
-                    )
-                        && !is_color_picker_active(&color_picker_info)
-                            && !color_picker_closed_this_frame
-                        {
-                            debug!("Hit left click on text tool");
-                            // Start text
-                            if working_text.is_none() {
-                                working_text = Some(Text {
-                                    content: "".to_string(),
-                                    position: Some(mouse_drawing_pos),
-                                    size: state.text_size,
-                                    color: state.text_color,
-                                });
-                            }
-                            state.mode = Mode::TypingText;
+                    ) && !is_color_picker_active(&color_picker_info)
+                        && !color_picker_closed_this_frame
+                    {
+                        debug!("Hit left click on text tool");
+                        // Start text
+                        if working_text.is_none() {
+                            working_text = Some(Text {
+                                content: "".to_string(),
+                                position: Some(mouse_drawing_pos),
+                                size: state.text_size,
+                                color: state.text_color,
+                            });
                         }
+                        state.mode = Mode::TypingText;
+                    }
                 }
                 Tool::ColorPicker => {
                     if is_mouse_button_down(
@@ -331,6 +332,14 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                                 }
                             }
                         }
+                        state.selected_things = if !things_in_selection.is_empty() {
+                            // TODO: Handle multiple selection, not just 1 item at a time
+                            Some(things_in_selection[0])
+                            // TODO: If something is successfully selected, we should go into
+                            // MoveTool mode right?
+                        } else {
+                            None
+                        };
                     }
                 }
             },
@@ -479,7 +488,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                 let mut drawing_camera = drawing.begin_mode2D(state.camera);
 
                 drawing_camera.clear_background(state.background_color.0);
-                for (_, thing) in &state.things {
+                for (thing_key, thing) in &state.things {
                     match &thing.kind {
                         Renderable::Stroke(stroke) => {
                             if is_stroke_in_camera_view(&camera_view_boundary, stroke) {
@@ -499,6 +508,14 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                                 }
                             }
                         }
+                    }
+                    if Some(thing_key) == state.selected_things {
+                        // Rough bounding box draw so we can see what we've currently selected
+                        drawing_camera.draw_rectangle_lines_ex(
+                            thing.bounding_box().unwrap().bounds,
+                            1.0,
+                            Color::DARKRED,
+                        );
                     }
                 }
                 if debugging {
