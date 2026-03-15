@@ -324,19 +324,17 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         MouseButton::MOUSE_BUTTON_LEFT,
                         &mut mouse_buttons_pressed_this_frame,
                     ) {
-                        // BUG: Dragging 'negative' boxes behaves weird (draws a big block instead
-                        // of a 'drag box'). Also the starting and end positions we use for the
-                        // mouse seem wrong. Mismatch between drawing_pos and mouse_pos?
                         if let Some(drag_box) = state.mouse_drag_box {
-                            let drag_box = rrect(
-                                drag_box.x,
-                                drag_box.y,
-                                drag_box.x + mouse_drawing_pos.x,
-                                drag_box.y + mouse_drawing_pos.y,
-                            );
+                            let drag_box = BoundingBox2D {
+                                min: drag_box.min,
+                                max: rvec2(mouse_drawing_pos.x, mouse_drawing_pos.y),
+                            };
                             state.mouse_drag_box = Some(drag_box);
                         } else {
-                            let drag_box = rrect(mouse_drawing_pos.x, mouse_drawing_pos.y, 1, 1);
+                            let drag_box = BoundingBox2D {
+                                min: rvec2(mouse_drawing_pos.x, mouse_drawing_pos.y),
+                                max: rvec2(mouse_drawing_pos.x, mouse_drawing_pos.y),
+                            };
                             state.mouse_drag_box = Some(drag_box);
                         }
                     } else {
@@ -345,7 +343,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         if let Some(drag_box) = state.mouse_drag_box {
                             for (thing_key, thing) in &state.things {
                                 if let Some(bounding_box) = thing.bounding_box() {
-                                    if bounding_box.bounds.check_collision_recs(&drag_box) {
+                                    if bounding_box.rect().check_collision_recs(&drag_box.rect()) {
                                         things_in_selection.push(thing_key);
                                     }
                                 }
@@ -539,7 +537,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         if thing_key == *selected_thing_key {
                             // Rough bounding box draw so we can see what we've currently selected
                             drawing_camera.draw_rectangle_lines_ex(
-                                thing.bounding_box().unwrap().bounds,
+                                thing.bounding_box().unwrap().rect(),
                                 1.0,
                                 Color::DARKRED,
                             );
@@ -548,7 +546,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                 }
 
                 if let Some(drag_box) = state.mouse_drag_box {
-                    drawing_camera.draw_rectangle_lines_ex(drag_box, 1.0, Color::GRAY);
+                    drawing_camera.draw_rectangle_lines_ex(drag_box.rect(), 1.0, Color::TEAL);
                 }
 
                 // TODO(reece): Do we want to treat the working_stroke as a special case to draw?
@@ -781,13 +779,33 @@ pub(crate) struct Thing {
     pub kind: Renderable,
 }
 
-#[derive(Debug)]
-pub struct BoundingBox {
-    pub bounds: Rectangle,
+#[derive(Debug, Copy, Clone)]
+pub struct BoundingBox2D {
+    // Looks like Raylib doesn't like negative widths or heights for rectangle
+    // drawing https://github.com/raysan5/raylib/issues/671, so we just keep track of the points
+    // that we can convert to a rectangle later
+    pub min: Vector2,
+    pub max: Vector2,
+}
+
+impl BoundingBox2D {
+    pub fn rect(&self) -> Rectangle {
+        let x = self.min.x.min(self.max.x);
+        let y = self.min.y.min(self.max.y);
+        let width = (self.min.x - self.max.x).abs();
+        let height = (self.min.y - self.max.y).abs();
+
+        Rectangle {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
 }
 
 impl Thing {
-    pub fn bounding_box(&self) -> Option<BoundingBox> {
+    pub fn bounding_box(&self) -> Option<BoundingBox2D> {
         match &self.kind {
             Renderable::Stroke(stroke) => {
                 let (min_x, max_x, min_y, max_y) = stroke.points.iter().fold(
@@ -807,8 +825,9 @@ impl Thing {
                     },
                 );
 
-                return Some(BoundingBox {
-                    bounds: rrect(min_x, min_y, max_x - min_x, max_y - min_y),
+                return Some(BoundingBox2D {
+                    min: rvec2(min_x, min_y),
+                    max: rvec2(max_x, max_y),
                 });
             }
             Renderable::Text(_text) => todo!(),

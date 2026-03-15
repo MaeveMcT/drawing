@@ -32,6 +32,6 @@ pub fn draw_bounding_boxes(
 ) {
     for (_, thing) in things {
         let bounding_box = thing.bounding_box().unwrap();
-        drawing_camera.draw_rectangle_lines_ex(bounding_box.bounds, 1.0, Color::PURPLE);
+        drawing_camera.draw_rectangle_lines_ex(bounding_box.rect(), 1.0, Color::PURPLE);
     }
 }

@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
 use raylib::check_collision_circles;
-use raylib::math::{Rectangle, Vector2};
+use raylib::math::{BoundingBox, Vector2};
 use raylib::{camera::Camera2D, color::Color};
 use serde::{Deserialize, Serialize};
 
-use crate::app::{Action, Mode, Renderable, Thing, ThingKey, Things, Tool};
+use crate::app::{Action, BoundingBox2D, Mode, Renderable, Thing, ThingKey, Things, Tool};
 
 #[derive(Deserialize, Serialize)]
 pub struct BackgroundColor(pub Color);
@@ -67,7 +67,7 @@ pub struct State {
     #[serde(skip)]
     pub selected_things: Vec<ThingKey>,
     #[serde(skip)]
-    pub mouse_drag_box: Option<Rectangle>,
+    pub mouse_drag_box: Option<BoundingBox2D>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
