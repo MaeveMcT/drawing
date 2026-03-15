@@ -104,7 +104,8 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
         is_playing_inputs: false,
         current_play_frame: 0,
         play_frame_counter: 0,
-        selected_things: None,
+        selected_things: vec![],
+        mouse_drag_box: None,
     };
 
     if let Some(replay_path) = replay_path {
@@ -323,25 +324,40 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         MouseButton::MOUSE_BUTTON_LEFT,
                         &mut mouse_buttons_pressed_this_frame,
                     ) {
-                        // TODO: Drag a selection area rather than a single point
+                        // BUG: Dragging 'negative' boxes behaves weird (draws a big block instead
+                        // of a 'drag box'). Also the starting and end positions we use for the
+                        // mouse seem wrong. Mismatch between drawing_pos and mouse_pos?
+                        if let Some(drag_box) = state.mouse_drag_box {
+                            let drag_box = rrect(
+                                drag_box.x,
+                                drag_box.y,
+                                drag_box.x + mouse_drawing_pos.x,
+                                drag_box.y + mouse_drawing_pos.y,
+                            );
+                            state.mouse_drag_box = Some(drag_box);
+                        } else {
+                            let drag_box = rrect(mouse_drawing_pos.x, mouse_drawing_pos.y, 1, 1);
+                            state.mouse_drag_box = Some(drag_box);
+                        }
+                    } else {
                         let mut things_in_selection = vec![];
-                        for (thing_key, thing) in &state.things {
-                            if let Some(bounding_box) = thing.bounding_box() {
-                                if bounding_box.is_point_within(mouse_drawing_pos) {
-                                    things_in_selection.push(thing_key);
+                        // Gather everything that was in the drag box
+                        if let Some(drag_box) = state.mouse_drag_box {
+                            for (thing_key, thing) in &state.things {
+                                if let Some(bounding_box) = thing.bounding_box() {
+                                    if bounding_box.bounds.check_collision_recs(&drag_box) {
+                                        things_in_selection.push(thing_key);
+                                    }
                                 }
                             }
+                            if !things_in_selection.is_empty() {
+                                state.mode = Mode::UsingTool(Tool::Move);
+                                state.selected_things = things_in_selection;
+                            } else {
+                                state.selected_things.clear();
+                            };
                         }
-                        state.selected_things = if !things_in_selection.is_empty() {
-                            // TODO: Handle multiple selection, not just 1 item at a time
-                            state.mode = Mode::UsingTool(Tool::Move);
-                            Some(things_in_selection[0])
-
-                            // TODO: If something is successfully selected, we should go into
-                            // MoveTool mode right?
-                        } else {
-                            None
-                        };
+                        state.mouse_drag_box = None;
                     }
                 }
                 Tool::Move => {
@@ -493,6 +509,11 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                 let mut drawing_camera = drawing.begin_mode2D(state.camera);
 
                 drawing_camera.clear_background(state.background_color.0);
+
+                if debugging {
+                    draw_bounding_boxes(&state.things, &mut drawing_camera);
+                }
+
                 for (thing_key, thing) in &state.things {
                     match &thing.kind {
                         Renderable::Stroke(stroke) => {
@@ -514,17 +535,20 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                             }
                         }
                     }
-                    if Some(thing_key) == state.selected_things {
-                        // Rough bounding box draw so we can see what we've currently selected
-                        drawing_camera.draw_rectangle_lines_ex(
-                            thing.bounding_box().unwrap().bounds,
-                            1.0,
-                            Color::DARKRED,
-                        );
+                    for selected_thing_key in &state.selected_things {
+                        if thing_key == *selected_thing_key {
+                            // Rough bounding box draw so we can see what we've currently selected
+                            drawing_camera.draw_rectangle_lines_ex(
+                                thing.bounding_box().unwrap().bounds,
+                                1.0,
+                                Color::DARKRED,
+                            );
+                        }
                     }
                 }
-                if debugging {
-                    draw_bounding_boxes(&state.things, &mut drawing_camera);
+
+                if let Some(drag_box) = state.mouse_drag_box {
+                    drawing_camera.draw_rectangle_lines_ex(drag_box, 1.0, Color::GRAY);
                 }
 
                 // TODO(reece): Do we want to treat the working_stroke as a special case to draw?
@@ -760,12 +784,6 @@ pub(crate) struct Thing {
 #[derive(Debug)]
 pub struct BoundingBox {
     pub bounds: Rectangle,
-}
-
-impl BoundingBox {
-    fn is_point_within(&self, pos: Vector2) -> bool {
-        self.bounds.check_collision_point_rec(pos)
-    }
 }
 
 impl Thing {

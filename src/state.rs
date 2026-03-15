@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use raylib::check_collision_circles;
-use raylib::math::Vector2;
+use raylib::math::{Rectangle, Vector2};
 use raylib::{camera::Camera2D, color::Color};
 use serde::{Deserialize, Serialize};
 
@@ -65,7 +65,9 @@ pub struct State {
     #[serde(skip)]
     pub play_frame_counter: usize,
     #[serde(skip)]
-    pub selected_things: Option<ThingKey>,
+    pub selected_things: Vec<ThingKey>,
+    #[serde(skip)]
+    pub mouse_drag_box: Option<Rectangle>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
