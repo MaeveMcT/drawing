@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use raylib::check_collision_circles;
-use raylib::math::{BoundingBox, Vector2};
+use raylib::math::Vector2;
 use raylib::{camera::Camera2D, color::Color};
 use serde::{Deserialize, Serialize};
 
@@ -100,6 +100,32 @@ impl State {
         None
     }
 
+    pub fn move_things_with_undo(&mut self, thing_keys: &[ThingKey], move_diff: Vector2) {
+        self.apply_move_to_things(thing_keys, move_diff);
+        self.undo_actions.push(Action::MoveThings(thing_keys.to_vec(), move_diff));
+    }
+
+    pub fn apply_move_to_things(&mut self, thing_keys: &[ThingKey], move_diff: Vector2) {
+        for key in thing_keys {
+            if let Some(thing) = self.things.get_mut(*key) {
+                match &mut thing.kind {
+                    Renderable::Stroke(stroke) => {
+                        for point in &mut stroke.points {
+                            point.x += move_diff.x;
+                            point.y += move_diff.y;
+                        }
+                    }
+                    Renderable::Text(text) => {
+                        if let Some(position) = &mut text.position {
+                            position.x += move_diff.x;
+                            position.y += move_diff.y;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn add_thing_to_graveyard(&mut self, thing: Thing) -> ThingKey {
         self.things_graveyard.insert(thing)
     }
@@ -132,6 +158,13 @@ impl State {
                             break;
                         }
                     }
+                    Action::MoveThings(thing_keys, move_diff) => {
+                        // Undo by applying the inverse move
+                        let inverse_diff = Vector2 { x: -move_diff.x, y: -move_diff.y };
+                        self.apply_move_to_things(&thing_keys, inverse_diff);
+                        self.redo_actions.push(Action::MoveThings(thing_keys, move_diff));
+                        break;
+                    }
                 }
             } else {
                 break;
@@ -154,6 +187,12 @@ impl State {
                             self.undo_actions.push(Action::RemoveThing(new_key));
                             break;
                         }
+                    }
+                    Action::MoveThings(thing_keys, move_diff) => {
+                        // Redo by applying the original move again
+                        self.apply_move_to_things(&thing_keys, move_diff);
+                        self.undo_actions.push(Action::MoveThings(thing_keys, move_diff));
+                        break;
                     }
                 }
             } else {

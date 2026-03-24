@@ -1,4 +1,4 @@
-use crate::app::{Brush, Stroke, Things};
+use crate::app::{Brush, Renderable, Stroke, Thing, Things};
 use raylib::color::Color;
 use raylib::drawing::{RaylibDraw, RaylibDrawHandle, RaylibMode2D};
 use raylib::math::{rvec2, Vector2};
@@ -10,6 +10,51 @@ pub fn draw_stroke(drawing: &mut RaylibMode2D<RaylibDrawHandle>, stroke: &Stroke
 
     let points: &Vec<Vector2> = &stroke.points.iter().map(|p| rvec2(p.x, p.y)).collect();
     drawing.draw_spline_basis(points, brush_size, stroke.color);
+}
+
+pub fn draw_stroke_at_offset(
+    drawing: &mut RaylibMode2D<RaylibDrawHandle>,
+    stroke: &Stroke,
+    brush_size: f32,
+    offset: Vector2,
+) {
+    if stroke.points.is_empty() {
+        return;
+    }
+
+    let points: Vec<Vector2> = stroke
+        .points
+        .iter()
+        .map(|p| rvec2(p.x + offset.x, p.y + offset.y))
+        .collect();
+    drawing.draw_spline_basis(&points, brush_size, stroke.color);
+}
+
+pub fn draw_thing_at_offset(
+    drawing: &mut RaylibMode2D<RaylibDrawHandle>,
+    thing: &Thing,
+    offset: Vector2,
+) {
+    match &thing.kind {
+        Renderable::Stroke(stroke) => {
+            draw_stroke_at_offset(drawing, stroke, stroke.brush_size, offset);
+        }
+        Renderable::Text(text) => {
+            if let Some(pos) = text.position {
+                let offset_pos = Vector2 {
+                    x: pos.x + offset.x,
+                    y: pos.y + offset.y,
+                };
+                drawing.draw_text(
+                    &text.content,
+                    offset_pos.x as i32,
+                    offset_pos.y as i32,
+                    text.size.0 as i32,
+                    text.color.0,
+                );
+            }
+        }
+    }
 }
 
 pub fn draw_brush_marker(

@@ -20,7 +20,7 @@ use crate::input::{
     get_char_pressed, is_mouse_button_down, is_mouse_button_pressed, process_key_down_events,
     process_key_pressed_events, was_mouse_button_released,
 };
-use crate::render::{draw_bounding_boxes, draw_brush_marker, draw_stroke};
+use crate::render::{draw_bounding_boxes, draw_brush_marker, draw_stroke, draw_thing_at_offset};
 use crate::state::{ForegroundColor, State, TextColor, TextSize};
 use crate::{gui::debug_draw_info, input::append_input_to_working_text};
 
@@ -124,6 +124,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
     let mut is_drawing = false;
     let mut working_stroke = Stroke::new(ForegroundColor::default().0, brush.brush_size);
     let mut working_text: Option<Text> = None;
+    let mut working_move: Option<(Vector2, Vector2)> = None;
     let mut last_mouse_pos = rl.get_mouse_position();
 
     let mut color_picker_info: Option<GuiColorPickerInfo> = None;
@@ -359,7 +360,43 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                     }
                 }
                 Tool::Move => {
-                    // TODO: Implement move functionality
+                    if is_mouse_button_down(
+                        &mut rl,
+                        MouseButton::MOUSE_BUTTON_LEFT,
+                        &mut mouse_buttons_pressed_this_frame,
+                    ) {
+                        // When we press the mouse button, we should start tracking
+                        // - Where the mouse was pressed originally
+                        // - Where the mouse currently is
+
+                        if let Some(working_move) = working_move.as_mut() {
+                            working_move.1 = mouse_drawing_pos;
+                        } else {
+                            working_move = Some((mouse_drawing_pos, mouse_drawing_pos));
+                        }
+                    }
+
+                    if was_mouse_button_released(
+                        &mut rl,
+                        MouseButton::MOUSE_BUTTON_LEFT,
+                        &mouse_buttons_pressed_last_frame,
+                    ) {
+                        // When we release the mouse button, apply the move action
+                        if let Some(working_move) = working_move {
+                            let move_diff = working_move.1 - working_move.0;
+
+                            // Only apply move if there was actual movement
+                            if move_diff.x.abs() > 0.0 || move_diff.y.abs() > 0.0 {
+                                state.move_things_with_undo(
+                                    &state.selected_things.clone(),
+                                    move_diff,
+                                );
+                            }
+                        }
+                        working_move = None;
+                        state.selected_things.clear();
+                        state.mode = Mode::UsingTool(Tool::Brush);
+                    }
                 }
             },
             Mode::PickingBackgroundColor(color_picker) => {
@@ -513,34 +550,43 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                 }
 
                 for (thing_key, thing) in &state.things {
-                    match &thing.kind {
-                        Renderable::Stroke(stroke) => {
-                            if is_stroke_in_camera_view(&camera_view_boundary, stroke) {
-                                draw_stroke(&mut drawing_camera, stroke, stroke.brush_size);
+                    // Skip rendering selected things if we're actively dragging them in move mode
+                    let is_dragging_selected = state.mode == Mode::UsingTool(Tool::Move)
+                        && working_move.is_some()
+                        && state.selected_things.contains(&thing_key);
+
+                    if !is_dragging_selected {
+                        match &thing.kind {
+                            Renderable::Stroke(stroke) => {
+                                if is_stroke_in_camera_view(&camera_view_boundary, stroke) {
+                                    draw_stroke(&mut drawing_camera, stroke, stroke.brush_size);
+                                }
                             }
-                        }
-                        Renderable::Text(text) => {
-                            if let Some(pos) = text.position {
-                                if camera_view_boundary.check_collision_point_rec(pos) {
-                                    drawing_camera.draw_text(
-                                        &text.content,
-                                        pos.x as i32,
-                                        pos.y as i32,
-                                        text.size.0 as i32,
-                                        text.color.0,
-                                    );
+                            Renderable::Text(text) => {
+                                if let Some(pos) = text.position {
+                                    if camera_view_boundary.check_collision_point_rec(pos) {
+                                        drawing_camera.draw_text(
+                                            &text.content,
+                                            pos.x as i32,
+                                            pos.y as i32,
+                                            text.size.0 as i32,
+                                            text.color.0,
+                                        );
+                                    }
                                 }
                             }
                         }
                     }
-                    for selected_thing_key in &state.selected_things {
-                        if thing_key == *selected_thing_key {
-                            // Rough bounding box draw so we can see what we've currently selected
-                            drawing_camera.draw_rectangle_lines_ex(
-                                thing.bounding_box().unwrap().rect(),
-                                1.0,
-                                Color::DARKRED,
-                            );
+                    if !is_dragging_selected {
+                        for selected_thing_key in &state.selected_things {
+                            if thing_key == *selected_thing_key {
+                                // Rough bounding box draw so we can see what we've currently selected
+                                drawing_camera.draw_rectangle_lines_ex(
+                                    thing.bounding_box().unwrap().rect(),
+                                    1.0,
+                                    Color::DARKRED,
+                                );
+                            }
                         }
                     }
                 }
@@ -549,7 +595,39 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                     drawing_camera.draw_rectangle_lines_ex(drag_box.rect(), 1.0, Color::TEAL);
                 }
 
-                // TODO(reece): Do we want to treat the working_stroke as a special case to draw?
+                // Draw move preview when dragging selected items
+                if state.mode == Mode::UsingTool(Tool::Move) {
+                    if let Some(working_move) = working_move {
+                        let move_diff = working_move.1 - working_move.0;
+
+                        // Draw preview of selected things at their new positions
+                        for selected_key in &state.selected_things {
+                            if let Some(thing) = state.things.get(*selected_key) {
+                                draw_thing_at_offset(&mut drawing_camera, thing, move_diff);
+                            }
+                        }
+
+                        // Draw bounding boxes for the preview
+                        for selected_key in &state.selected_things {
+                            if let Some(thing) = state.things.get(*selected_key) {
+                                if let Some(mut bbox) = thing.bounding_box() {
+                                    // Offset the bounding box to show preview position
+                                    bbox.min.x += move_diff.x;
+                                    bbox.min.y += move_diff.y;
+                                    bbox.max.x += move_diff.x;
+                                    bbox.max.y += move_diff.y;
+                                    drawing_camera.draw_rectangle_lines_ex(
+                                        bbox.rect(),
+                                        1.0,
+                                        Color::LIME,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // TODO: Do we want to treat the working_stroke as a special case to draw?
                 draw_stroke(
                     &mut drawing_camera,
                     &working_stroke,
@@ -855,6 +933,7 @@ new_key_type! { pub(crate) struct TextKey; }
 pub(crate) enum Action {
     AddThing(ThingKey),
     RemoveThing(ThingKey),
+    MoveThings(Vec<ThingKey>, Vector2),
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
