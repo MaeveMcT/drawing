@@ -343,7 +343,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         // Gather everything that was in the drag box
                         if let Some(drag_box) = state.mouse_drag_box {
                             for (thing_key, thing) in &state.things {
-                                if let Some(bounding_box) = thing.bounding_box() {
+                                if let Some(bounding_box) = thing.bounding_box(&font) {
                                     if bounding_box.rect().check_collision_recs(&drag_box.rect()) {
                                         things_in_selection.push(thing_key);
                                     }
@@ -546,7 +546,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                 drawing_camera.clear_background(state.background_color.0);
 
                 if debugging {
-                    draw_bounding_boxes(&state.things, &mut drawing_camera);
+                    draw_bounding_boxes(&state.things, &mut drawing_camera, &font);
                 }
 
                 for (thing_key, thing) in &state.things {
@@ -582,7 +582,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                             if thing_key == *selected_thing_key {
                                 // Rough bounding box draw so we can see what we've currently selected
                                 drawing_camera.draw_rectangle_lines_ex(
-                                    thing.bounding_box().unwrap().rect(),
+                                    thing.bounding_box(&font).unwrap().rect(),
                                     1.0,
                                     Color::DARKRED,
                                 );
@@ -610,7 +610,7 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                         // Draw bounding boxes for the preview
                         for selected_key in &state.selected_things {
                             if let Some(thing) = state.things.get(*selected_key) {
-                                if let Some(mut bbox) = thing.bounding_box() {
+                                if let Some(mut bbox) = thing.bounding_box(&font) {
                                     // Offset the bounding box to show preview position
                                     bbox.min.x += move_diff.x;
                                     bbox.min.y += move_diff.y;
@@ -883,7 +883,7 @@ impl BoundingBox2D {
 }
 
 impl Thing {
-    pub fn bounding_box(&self) -> Option<BoundingBox2D> {
+    pub fn bounding_box(&self, font: &raylib::text::WeakFont) -> Option<BoundingBox2D> {
         match &self.kind {
             Renderable::Stroke(stroke) => {
                 let (min_x, max_x, min_y, max_y) = stroke.points.iter().fold(
@@ -908,7 +908,34 @@ impl Thing {
                     max: rvec2(max_x, max_y),
                 });
             }
-            Renderable::Text(_text) => todo!(),
+            Renderable::Text(text) => {
+                if let Some(position) = text.position {
+                    let c_text = std::ffi::CString::new(text.content.as_str()).unwrap();
+                    let ffi_font: &raylib::ffi::Font = font.as_ref();
+                    let text_dimensions = unsafe {
+                        raylib::ffi::MeasureTextEx(
+                            *ffi_font,
+                            c_text.as_ptr(),
+                            text.size.0 as f32,
+                            0.0,
+                        )
+                    };
+
+                    // Add a proportional buffer to the measured dimensions. Bounding box is too
+                    // small in longer strings otherwise.
+                    // This scales with the actual text size, not a fixed amount
+                    let width_buffer = text_dimensions.x * 0.25;
+
+                    return Some(BoundingBox2D {
+                        min: position,
+                        max: rvec2(
+                            position.x + text_dimensions.x + width_buffer,
+                            position.y + text_dimensions.y,
+                        ),
+                    });
+                }
+                None
+            }
         }
     }
 }
@@ -944,6 +971,7 @@ pub(crate) struct Text {
     pub size: TextSize,
     #[serde(default)]
     pub color: TextColor,
+    // TODO: Add support for different fonts per text
 }
 
 type CameraZoomPercentageDiff = i32;

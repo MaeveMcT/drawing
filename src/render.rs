@@ -2,6 +2,7 @@ use crate::app::{Brush, Renderable, Stroke, Thing, Things};
 use raylib::color::Color;
 use raylib::drawing::{RaylibDraw, RaylibDrawHandle, RaylibMode2D};
 use raylib::math::{rvec2, Vector2};
+use raylib::text::WeakFont;
 
 pub fn draw_stroke(drawing: &mut RaylibMode2D<RaylibDrawHandle>, stroke: &Stroke, brush_size: f32) {
     if stroke.points.is_empty() {
@@ -74,9 +75,10 @@ pub fn draw_brush_marker(
 pub fn draw_bounding_boxes(
     things: &Things,
     drawing_camera: &mut RaylibMode2D<'_, RaylibDrawHandle<'_>>,
+    font: &WeakFont,
 ) {
     for (_, thing) in things {
-        let bounding_box = thing.bounding_box().unwrap();
+        let bounding_box = thing.bounding_box(font).unwrap();
         drawing_camera.draw_rectangle_lines_ex(bounding_box.rect(), 1.0, Color::PURPLE);
     }
 }
