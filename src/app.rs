@@ -564,7 +564,13 @@ pub fn run(replay_path: Option<PathBuf>, test_options: Option<TestSettings>) {
                             }
                             Renderable::Text(text) => {
                                 if let Some(pos) = text.position {
-                                    if camera_view_boundary.check_collision_point_rec(pos) {
+                                    let text_bounds = rrect(
+                                        pos.x,
+                                        pos.y,
+                                        (text.size.0 as usize * text.content.len()) as f32,
+                                        text.size.0 as f32,
+                                    );
+                                    if camera_view_boundary.check_collision_recs(&text_bounds) {
                                         drawing_camera.draw_text(
                                             &text.content,
                                             pos.x as i32,
